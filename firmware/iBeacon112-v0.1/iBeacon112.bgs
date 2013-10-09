@@ -1,10 +1,25 @@
 dim custom_adv_data(30)
 dim custom_sr_data(10)
 
+dim connected
+dim encrypted
+
 event system_boot(major, minor, patch, build, ll_version, protocol, hw)	
 	
+	# set all GPIO pins to input/high (pull), except P1_0 and P1_1 to output HIGH (no internal pull-ups)
+    # P1_0/1 will leak current if not externally pulled or set as outputs
+    call hardware_io_port_config_direction(0, $0)
+    call hardware_io_port_write(0, $ff, $ff)
+    call hardware_io_port_config_direction(1, $3)
+    call hardware_io_port_write(1, $ff, $ff)
+    call hardware_io_port_config_direction(2, $0)
+    call hardware_io_port_write(2, $ff, $ff)
+	
+	# set advertisement interval to 1 second, all three channels
+    call gap_set_adv_parameters(1600, 1600, 3)
+	
 	# Set advertisement interval to 100 to 500ms. Use all advertisement channels
-	call gap_set_adv_parameters(20, 100, 7)
+	# call gap_set_adv_parameters(20, 100, 7)
 	
 	#set to advertising mode
 	call gap_set_mode(gap_user_data, gap_undirected_connectable)
@@ -53,7 +68,7 @@ event system_boot(major, minor, patch, build, ll_version, protocol, hw)
 	
 	# Minor
 	custom_adv_data(27:1) = $00
-	custom_adv_data(28:1) = $01
+	custom_adv_data(28:1) = $03
 
 	# Measured power at 1 meter (specified in 2's complement, so 0xC6 is -58)
 	custom_adv_data(29:1) = $c6
@@ -78,4 +93,29 @@ event system_boot(major, minor, patch, build, ll_version, protocol, hw)
 	# Set Scan Record data
 	call gap_set_adv_data(1, 12, custom_sr_data(0:12))
 	
+end
+
+# catch new or updated connection
+event connection_status(connection, flags, address, address_type, conn_interval, timeout, latency, bonding)
+    # check for "new connection established" event
+    if (flags & $05) = $05 then
+        # update status vars
+        connected = 1
+    end if
+    
+    # check for "encrypted" status (e.g. connected + paired)
+    if (flags & $02) = $02 then
+        # update status vars
+        encrypted = 1
+    end if
+end
+
+# catch disconnection
+event connection_disconnected(handle, result)
+    # if disconnected, return to advertisement mode
+    call gap_set_mode(gap_general_discoverable, gap_undirected_connectable)
+
+    # update status vars
+    connected = 0
+    encrypted = 0
 end
