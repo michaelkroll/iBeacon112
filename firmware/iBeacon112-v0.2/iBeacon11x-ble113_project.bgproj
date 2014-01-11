@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<project>
+    <gatt in="iBeacon11x-gatt.xml" />
+    <hardware in="iBeacon11x-hardware.xml" /> 
+    <script in="iBeacon11x.bgs" />
+    <image out="iBeacon11x.hex" />  
+    <device type="ble113" />  
+</project>
